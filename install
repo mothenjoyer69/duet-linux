@@ -1,0 +1,50 @@
+#!/bin/bash
+export ARCH=arm64
+export CROSS_COMPILE=aarch64-linux-gnu-
+
+ROOT=$(dirname $(dirname $(realpath $0)))/duet-linux
+
+mkdir $ROOT/builds
+curl -L "$(curl -sL https://www.kernel.org/ | grep "Download complete tarball" | head -n1 | tr '"' ' ' | awk '{print $3}')" -o $ROOT/builds/Linux-archive
+cd $ROOT/builds
+mkdir linux
+bsdtar xvf Linux-archive --strip-components=1 -C linux
+cd linux
+
+for x in $(ls $ROOT/kernel/patches/*.patch); do
+	echo "Applying $x"
+	patch -p1 --forward < $x
+done
+
+cp $ROOT/kernel/krane-config $ROOT/builds/linux/.config
+#make menuconfig
+make -j$(nproc)
+
+mkdir $ROOT/assembly
+
+cp "$ROOT/kernel/kernel.its" $ROOT/assembly/kernel.its
+cp "$ROOT/kernel/cmdline" $ROOT/assembly/cmdline
+cp "$ROOT/kernel/cmdline.p2" $ROOT/assembly/cmdline.p2
+cp "$ROOT/builds/linux/arch/arm64/boot/Image.gz" $ROOT/assembly
+cp "$ROOT/builds/linux/arch/arm64/boot/Image" $ROOT/assembly
+cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku0.dtb" $ROOT/assembly 
+cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku176.dtb" $ROOT/assembly
+cd "$ROOT/assembly"
+dd if=/dev/zero of=bootloader.bin bs=512 count=1
+mkimage -D "-I dts -O dtb -p 2048" -f kernel.its vmlinux.uimg
+dd if=/dev/zero of=bootloader.bin bs=512 count=1
+vbutil_kernel --pack vmlinux.kpart \
+	--version 1 \
+	--vmlinuz vmlinux.uimg \
+	--arch arm \
+	--keyblock /usr/share/vboot/devkeys/kernel.keyblock \
+	--signprivate /usr/share/vboot/devkeys/kernel_data_key.vbprivk \
+	--config cmdline \
+	--bootloader bootloader.bin
+
+mkdir "$ROOT/fin"
+cp vmlinux.kpart "$ROOT/fin/"
+
+rm -rf $ROOT/builds
+rm -rf $ROOT/assembly
+exit
