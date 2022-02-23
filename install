@@ -17,14 +17,13 @@ for x in $(ls $ROOT/kernel/patches/*.patch); do
 done
 
 cp $ROOT/kernel/krane-config $ROOT/builds/linux/.config
-#make menuconfig
+make menuconfig
 make -j$(nproc)
 
 mkdir $ROOT/assembly
 
 cp "$ROOT/kernel/kernel.its" $ROOT/assembly/kernel.its
 cp "$ROOT/kernel/cmdline" $ROOT/assembly/cmdline
-cp "$ROOT/kernel/cmdline.p2" $ROOT/assembly/cmdline.p2
 cp "$ROOT/builds/linux/arch/arm64/boot/Image.gz" $ROOT/assembly
 cp "$ROOT/builds/linux/arch/arm64/boot/Image" $ROOT/assembly
 cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku0.dtb" $ROOT/assembly 
@@ -33,7 +32,7 @@ cd "$ROOT/assembly"
 dd if=/dev/zero of=bootloader.bin bs=512 count=1
 mkimage -D "-I dts -O dtb -p 2048" -f kernel.its vmlinux.uimg
 dd if=/dev/zero of=bootloader.bin bs=512 count=1
-vbutil_kernel --pack vmlinux.kpart \
+vbutil_kernel --pack vmlinux.img \
 	--version 1 \
 	--vmlinuz vmlinux.uimg \
 	--arch arm \
@@ -43,8 +42,32 @@ vbutil_kernel --pack vmlinux.kpart \
 	--bootloader bootloader.bin
 
 mkdir "$ROOT/fin"
-cp vmlinux.kpart "$ROOT/fin/"
+cp vmlinux.img "$ROOT/fin/"
 
 rm -rf $ROOT/builds
 rm -rf $ROOT/assembly
+
+if [[ -e $1 ]]; then
+	echo "Creating 3 partitions on $1"
+	DEVICE=$1
+	KERNEL=${DEVICE}1
+	KERNEL2=${DEVICE}2
+	ROOTFS=${DEVICE}3
+	dd if=/dev/zero of=$DEVICE bs=1M count=64
+fi
+
+sync
+
+# make partition table
+parted --script $DEVICE mklabel gpt 
+cgpt create $1
+cgpt add -i 1 -t kernel -b 8192		-s 65536 -l SDKernelA -S 1 -T 2 -P 10 $DEVICE
+echo "Kernel part"
+cgpt add -i 2 -t kernel -b 73728	-s 65536 -l SDKernelB -S 0 -T 2 -P 5 $DEVICE
+echo "Kernel part 2"
+cgpt add -i 3 -t data -b 139264		-s $(expr $(cgpt show $1 | grep 'Sec GPT table' | awk '{print $1}') - 139264) -l Root $DEVICE
+echo "Rootfs part"
+sync
+partx -a $DEVICE >/dev/null 2>&1
+dd if="$ROOT/fin/vmlinux.img" of="$KERNEL"
 exit
