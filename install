@@ -24,11 +24,8 @@ mkdir $ROOT/assembly
 
 cp "$ROOT/kernel/kernel.its" $ROOT/assembly/kernel.its
 cp "$ROOT/kernel/cmdline" $ROOT/assembly/cmdline
-cp "$ROOT/builds/linux/arch/arm64/boot/Image.gz" $ROOT/assembly
-cp "$ROOT/builds/linux/arch/arm64/boot/Image" $ROOT/assembly
-cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku0.dtb" $ROOT/assembly 
-cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku176.dtb" $ROOT/assembly
-cd "$ROOT/assembly"
+cp "$ROOT/builds/linux/arch/arm64/boot/Image*" $ROOT/assembly
+cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku*.dtb" $ROOT/assembly 
 dd if=/dev/zero of=bootloader.bin bs=512 count=1
 mkimage -D "-I dts -O dtb -p 2048" -f kernel.its vmlinux.uimg
 dd if=/dev/zero of=bootloader.bin bs=512 count=1
