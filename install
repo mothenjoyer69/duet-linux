@@ -10,13 +10,13 @@ cd $ROOT/builds
 mkdir linux
 bsdtar xvf Linux-archive --strip-components=1 -C linux
 cd linux
-
+#todo: test if these are even needed
 for x in $(ls $ROOT/kernel/patches/*.patch); do
 	echo "Applying $x"
 	patch -p1 --forward < $x
 done
 
-cp $ROOT/kernel/krane-config $ROOT/builds/linux/.config
+cp $ROOT/kernel/krane.config $ROOT/builds/linux/.config
 make menuconfig
 make -j$(nproc)
 
@@ -43,10 +43,6 @@ vbutil_kernel --pack vmlinux.img \
 
 mkdir "$ROOT/fin"
 cp vmlinux.img "$ROOT/fin/"
-
-rm -rf $ROOT/builds
-rm -rf $ROOT/assembly
-
 if [[ -e $1 ]]; then
 	echo "Creating 3 partitions on $1"
 	DEVICE=$1
@@ -58,7 +54,7 @@ fi
 
 sync
 
-# make partition table
+# make partition table. blatantly stolen from Cadmium because its realistically the easiest way to do it.
 parted --script $DEVICE mklabel gpt 
 cgpt create $1
 cgpt add -i 1 -t kernel -b 8192		-s 65536 -l SDKernelA -S 1 -T 2 -P 10 $DEVICE
@@ -70,4 +66,19 @@ echo "Rootfs part"
 sync
 partx -a $DEVICE >/dev/null 2>&1
 dd if="$ROOT/fin/vmlinux.img" of="$KERNEL"
+dd if="$ROOT/fin/vmlinux.img" of="$KERNEL2"
+mount $ROOTFS /mnt 
+
+mkdir $ROOT/rootfs 
+cd $ROOT/rootfs
+dd if=/dev/zero of=$ROOTFS bs=1M count=64
+mkfs.ext4 -F $ROOTFS
+mount $ROOTFS /mnt
+#temporary testing
+wget https://dl-cdn.alpinelinux.org/alpine/v3.15/releases/aarch64/alpine-minirootfs-3.15.0-aarch64.tar.gz
+tar xzvpf $ROOT/rootfs/alpine-minirootfs-3.15.0-aarch64.tar.gz -C /mnt/ #this doesn't work currently, although it *does* boot. 
+cd $ROOT/builds/linux
+make INSTALL_MOD_PATH=/mnt modules_install
+umount $ROOTFS
+echo "success"
 exit
