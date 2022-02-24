@@ -2,33 +2,45 @@
 export ARCH=arm64
 export CROSS_COMPILE=aarch64-linux-gnu-
 
+echo $2
+dd if=/dev/zero of=$1 bs=1M count=64
+
 ROOT=$(dirname $(dirname $(realpath $0)))/duet-linux
-
-mkdir $ROOT/builds
-curl -L "$(curl -sL https://www.kernel.org/ | grep "Download complete tarball" | head -n1 | tr '"' ' ' | awk '{print $3}')" -o $ROOT/builds/Linux-archive
-cd $ROOT/builds
-mkdir linux
-bsdtar xvf Linux-archive --strip-components=1 -C linux
-cd linux
-#todo: test if these are even needed
-for x in $(ls $ROOT/kernel/patches/*.patch); do
-	echo "Applying $x"
-	patch -p1 --forward < $x
-done
-
-cp $ROOT/kernel/krane.config $ROOT/builds/linux/.config
-make menuconfig
-make -j$(nproc)
+if [[ $2 = "-build" ]];
+then
+	rm -rf $ROOT/builds
+	mkdir $ROOT/builds
+	echo "Rebuilding kernel..."
+	curl -L "$(curl -sL https://www.kernel.org/ | grep "Download complete tarball" | head -n1 | tr '"' ' ' | awk '{print $3}')" -o $ROOT/builds/Linux-archive
+	cd $ROOT/builds
+	mkdir linux
+	bsdtar xvf Linux-archive --strip-components=1 -C linux
+	cd linux
+	#todo: test if these are even needed
+	for x in $(ls $ROOT/kernel/patches/*.patch); do
+		echo "Applying $x"
+		patch -p1 --forward < $x
+	done
+	cp $ROOT/kernel/krane.config $ROOT/builds/linux/.config
+	make menuconfig
+	make -j$(nproc)
+elif [[ $2 = "-nobuild" ]];
+	then
+		echo "Not rebuilding kernel"
+	else
+		echo "Not rebuilding kernel"
+fi
 
 mkdir $ROOT/assembly
-
+cd $ROOT/assembly
 cp "$ROOT/kernel/kernel.its" $ROOT/assembly/kernel.its
 cp "$ROOT/kernel/cmdline" $ROOT/assembly/cmdline
-cp "$ROOT/builds/linux/arch/arm64/boot/Image*" $ROOT/assembly
-cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku*.dtb" $ROOT/assembly 
+cp "$ROOT/builds/linux/arch/arm64/boot/Image" $ROOT/assembly
+cp "$ROOT/builds/linux/arch/arm64/boot/Image.gz" $ROOT/assembly
+cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku0.dtb" $ROOT/assembly
+cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku176.dtb" $ROOT/assembly 
 dd if=/dev/zero of=bootloader.bin bs=512 count=1
 mkimage -D "-I dts -O dtb -p 2048" -f kernel.its vmlinux.uimg
-dd if=/dev/zero of=bootloader.bin bs=512 count=1
 vbutil_kernel --pack vmlinux.img \
 	--version 1 \
 	--vmlinuz vmlinux.uimg \
@@ -46,11 +58,8 @@ if [[ -e $1 ]]; then
 	KERNEL=${DEVICE}1
 	KERNEL2=${DEVICE}2
 	ROOTFS=${DEVICE}3
-	dd if=/dev/zero of=$DEVICE bs=1M count=64
+	dd if=/dev/zero of=$1 bs=1M count=64
 fi
-
-sync
-
 # make partition table. blatantly stolen from Cadmium because its realistically the easiest way to do it.
 parted --script $DEVICE mklabel gpt 
 cgpt create $1
@@ -64,18 +73,39 @@ sync
 partx -a $DEVICE >/dev/null 2>&1
 dd if="$ROOT/fin/vmlinux.img" of="$KERNEL"
 dd if="$ROOT/fin/vmlinux.img" of="$KERNEL2"
+mkfs.ext4 -F $ROOTFS
 mount $ROOTFS /mnt 
 
-mkdir $ROOT/rootfs 
-cd $ROOT/rootfs
-dd if=/dev/zero of=$ROOTFS bs=1M count=64
-mkfs.ext4 -F $ROOTFS
-mount $ROOTFS /mnt
-#temporary testing: TODO use qemu to fix some glaring issues prior to first boot, and switch rootfs.
-wget https://dl-cdn.alpinelinux.org/alpine/v3.15/releases/aarch64/alpine-minirootfs-3.15.0-aarch64.tar.gz
-tar xzvpf $ROOT/rootfs/alpine-minirootfs-3.15.0-aarch64.tar.gz -C /mnt/ #this doesn't work currently, although it *does* boot. 
-cd $ROOT/builds/linux
-make INSTALL_MOD_PATH=/mnt modules_install
-umount $ROOTFS
-echo "success"
+if [[ $3 = "-alpine" ]];
+	then
+		mkdir $ROOT/rootfs 
+		cd $ROOT/rootfs
+		mount $ROOTFS /mnt
+		#temporary testing: TODO use qemu to fix some glaring issues prior to first boot, and switch rootfs.
+		wget https://dl-cdn.alpinelinux.org/alpine/v3.15/releases/aarch64/alpine-minirootfs-3.15.0-aarch64.tar.gz
+		tar xzvpf $ROOT/rootfs/alpine-minirootfs-3.15.0-aarch64.tar.gz -C /mnt/ #this doesn't work currently, although it *does* boot. 
+		cd $ROOT/builds/linux
+		make INSTALL_MOD_PATH=/mnt modules_install
+		umount $ROOTFS
+		echo "Alpine rootfs installed"
+	elif [[ $3 = "-gentoo" ]];
+		then
+			mkdir $ROOT/rootfs 
+			cd $ROOT/rootfs
+			mount $ROOTFS /mnt
+			#temporary testing: TODO use qemu to fix some glaring issues prior to first boot, and switch rootfs.
+			wget https://bouncer.gentoo.org/fetch/root/all/releases/arm64/autobuilds/20220220T235324Z/stage3-arm64-openrc-20220220T235324Z.tar.xz
+			tar xvpf $ROOT/rootfs/stage3-arm64-openrc-20220220T235324Z.tar.xz -C /mnt/ #this doesn't work right currently, although it *does* boot.
+			echo "ACCEPT_KEYWORDS=\"arm64\"" >> /mnt/etc/portage/make.conf 
+			echo "MAKEOPTS=\"-j4\"" >> /mnt/etc/portage/make.conf 
+			sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow 
+			cd $ROOT/builds/linux
+			make INSTALL_MOD_PATH=/mnt modules_install
+			umount $ROOTFS	
+			echo "Gentoo rootfs installed"
+	else
+		echo "No rootfs selected"
+		exit
+	fi
+echo "Success"
 exit
