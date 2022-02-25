@@ -1,8 +1,8 @@
 #!/bin/bash
 export ARCH=arm64
 export CROSS_COMPILE=aarch64-linux-gnu-
-
-echo $2
+QEMU="$(which qemu-aarch64-static)"
+echo "Installing $2 with a kernel $1"
 dd if=/dev/zero of=$1 bs=1M count=64
 
 ROOT=$(dirname $(dirname $(realpath $0)))/duet-linux
@@ -86,9 +86,10 @@ if [[ $3 = "-alpine" ]];
 		tar xzvpf $ROOT/rootfs/alpine-minirootfs-3.15.0-aarch64.tar.gz -C /mnt/ #this doesn't work currently, although it *does* boot. 
 		cd $ROOT/builds/linux
 		make INSTALL_MOD_PATH=/mnt modules_install
+		sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow
 		umount $ROOTFS
 		echo "Alpine rootfs installed"
-	elif [[ $3 = "-gentoo" ]];
+	elif [[ $3 = "-gentoo" ]]; #just for testing a few things
 		then
 			mkdir $ROOT/rootfs 
 			cd $ROOT/rootfs
@@ -103,6 +104,23 @@ if [[ $3 = "-alpine" ]];
 			make INSTALL_MOD_PATH=/mnt modules_install
 			umount $ROOTFS	
 			echo "Gentoo rootfs installed"
+	elif [[ $3 = "-debian" ]]; #this is just for testing a few things
+		then
+			debootstrap --arch="arm64" "stable" "." https://deb.debian.org/debian/
+			mkdir $ROOT/rootfs 
+			cd $ROOT/rootfs
+			mount $ROOTFS /mnt
+			#temporary testing: TODO use qemu to fix some glaring issues prior to first boot, and switch rootfs.
+			debootstrap --arch="arm64" "stable" "/mnt" https://deb.debian.org/debian/
+			cd $ROOT/builds/linux
+			make INSTALL_MOD_PATH=/mnt modules_install
+			cp $QEMU /mnt
+			chroot /mnt /qemu-aarch64-static apt update
+			chroot /mnt /qemu-aarch64-static apt install -y nano network-manager debootstrap parted libudev-dev build-essential git
+			umount $ROOTFS	
+			echo "Debian rootfs installed"
+
+	#DEBIAN ROOTFS UNUSED FOR NOW AND EXCLUSIVELY FOR TESTING
 	else
 		echo "No rootfs selected"
 		exit
