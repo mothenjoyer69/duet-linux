@@ -97,9 +97,9 @@ case $2 in
 	-local)
 		echo "Installing to local eMMC"
 		MMC=$1
-		KERNEL=${DEVICE}1
-		KERNEL2=${DEVICE}2
-		ROOTFS=${DEVICE}3
+		KERNEL=${MMC}1
+		KERNEL2=${MMC}2
+		ROOTFS=${MMC}3
 		dd if=/dev/zero of=$MMC bs=512k count=128 seek=0
 		parted --script $MMC mklabel gpt 
 		cgpt create $1
