@@ -16,10 +16,10 @@ case $2 in
 		tar xvf Linux-archive --strip-components=1 -C linux
 		cd linux
 		#todo: test if these are even needed
-		for x in $(ls $ROOT/kernel/patches/*.patch); do
-			echo "Applying $x"
-			patch -p1 --forward < $x
-		done
+		#for x in $(ls $ROOT/kernel/patches/*.patch); do
+		#	echo "Applying $x"
+		#	patch -p1 --forward < $x
+		#done
 		cp $ROOT/kernel/krane.config $ROOT/builds/linux/.config
 		make menuconfig
 		make -j$(nproc)
@@ -160,8 +160,8 @@ if [[ $3 = "-alpine" ]];
 			cp $QEMU /mnt
 			sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow
 			#cp /etc/resolv.conf /mnt/etc/resolv.conf
-			#chroot /mnt /qemu-aarch64-static apt update
-			#chroot /mnt /qemu-aarch64-static apt install -y nano network-manager debootstrap parted libudev-dev build-essential git
+			chroot /mnt apt update
+			chroot /mnt apt install -y nano network-manager debootstrap parted libudev-dev build-essential git
 			umount $ROOTFS	
 			echo "Debian rootfs installed"
 
