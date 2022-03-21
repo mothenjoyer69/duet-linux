@@ -16,10 +16,10 @@ case $2 in
 		tar xvf Linux-archive --strip-components=1 -C linux
 		cd linux
 		#todo: test if these are even needed
-		#for x in $(ls $ROOT/kernel/patches/*.patch); do
-		#	echo "Applying $x"
-		#	patch -p1 --forward < $x
-		#done
+		for x in $(ls $ROOT/kernel/patches/*.patch); do
+			echo "Applying $x"
+			patch -p1 --forward < $x
+		done
 		cp $ROOT/kernel/krane.config $ROOT/builds/linux/.config
 		make menuconfig
 		make -j$(nproc)
@@ -120,8 +120,8 @@ case $2 in
 	esac
 
 #ROOTFS
-if [[ $3 = "-alpine" ]];
-	then
+case $3 in	
+	-alpine)
 		mkdir $ROOT/rootfs 
 		cd $ROOT/rootfs
 		mount $ROOTFS /mnt
@@ -133,42 +133,58 @@ if [[ $3 = "-alpine" ]];
 		sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow
 		umount $ROOTFS
 		echo "Alpine rootfs installed"
-	elif [[ $3 = "-gentoo" ]]; #just for testing a few things
-		then
-			mkdir $ROOT/rootfs 
-			cd $ROOT/rootfs
-			mount $ROOTFS /mnt
-			#temporary testing: TODO use qemu to fix some glaring issues prior to first boot, and switch rootfs.
-			wget https://bouncer.gentoo.org/fetch/root/all/releases/arm64/autobuilds/20220220T235324Z/stage3-arm64-openrc-20220220T235324Z.tar.xz
-			tar xvpf $ROOT/rootfs/stage3-arm64-openrc-20220220T235324Z.tar.xz -C /mnt/ #this doesn't work right currently, although it *does* boot.
-			echo "ACCEPT_KEYWORDS=\"arm64\"" >> /mnt/etc/portage/make.conf 
-			echo "MAKEOPTS=\"-j4\"" >> /mnt/etc/portage/make.conf 
-			sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow 
-			cd $ROOT/builds/linux
-			make INSTALL_MOD_PATH=/mnt modules_install
-			umount $ROOTFS	
-			echo "Gentoo rootfs installed"
-	elif [[ $3 = "-debian" ]]; #this is just for testing a few things
-		then
-			mkdir $ROOT/rootfs 
-			cd $ROOT/rootfs
-			mount $ROOTFS /mnt
-			#temporary testing: TODO use qemu to fix some glaring issues prior to first boot, and switch rootfs.
-			debootstrap --arch="arm64" "stable" "/mnt"  https://deb.debian.org/debian/
-			cd $ROOT/builds/linux
-			make INSTALL_MOD_PATH=/mnt modules_install
-			cp $QEMU /mnt
-			sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow
-			#cp /etc/resolv.conf /mnt/etc/resolv.conf
-			chroot /mnt apt update
-			chroot /mnt apt install -y nano network-manager debootstrap parted libudev-dev build-essential git
-			umount $ROOTFS	
-			echo "Debian rootfs installed"
-
-	#DEBIAN ROOTFS UNUSED FOR NOW AND EXCLUSIVELY FOR TESTING
-	else
-		echo "No rootfs selected"
-		exit
-	fi
+		;;
+	-gentoo)
+		mkdir $ROOT/rootfs 
+		cd $ROOT/rootfs
+		mount $ROOTFS /mnt
+		#temporary testing: TODO use qemu to fix some glaring issues prior to first boot, and switch rootfs.
+		wget https://bouncer.gentoo.org/fetch/root/all/releases/arm64/autobuilds/20220220T235324Z/stage3-arm64-openrc-20220220T235324Z.tar.xz
+		tar xvpf $ROOT/rootfs/stage3-arm64-openrc-20220220T235324Z.tar.xz -C /mnt/ #this doesn't work right currently, although it *does* boot.
+		echo "ACCEPT_KEYWORDS=\"arm64\"" >> /mnt/etc/portage/make.conf 
+		echo "MAKEOPTS=\"-j4\"" >> /mnt/etc/portage/make.conf 
+		sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow 
+		cd $ROOT/builds/linux
+		make INSTALL_MOD_PATH=/mnt modules_install
+		umount $ROOTFS	
+		echo "Gentoo rootfs installed"
+		;;
+	-debian)
+		mkdir $ROOT/rootfs 
+		cd $ROOT/rootfs
+		mount $ROOTFS /mnt
+		#temporary testing: TODO use qemu to fix some glaring issues prior to first boot, and switch rootfs.
+		debootstrap --arch="arm64" "stable" "/mnt"  https://deb.debian.org/debian/
+		cd $ROOT/builds/linux
+		make INSTALL_MOD_PATH=/mnt modules_install
+		cp $QEMU /mnt
+		sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow
+		#cp /etc/resolv.conf /mnt/etc/resolv.conf
+		chroot /mnt apt update
+		chroot /mnt apt install -y nano network-manager debootstrap parted libudev-dev build-essential git
+		umount $ROOTFS	
+		echo "Debian rootfs installed"
+		;;
+	-fedora)
+		rm -rf $ROOT/rootfs
+		mkdir $ROOT/rootfs
+		cd $ROOT/rootfs
+		mount $ROOTFS /mnt
+		wget https://download.fedoraproject.org/pub/fedora-secondary/releases/35/Spins/aarch64/images/Fedora-Minimal-35-1.2.aarch64.raw.xz -O fedora-duet.raw.xz
+		xz -vd $ROOT/rootfs/fedora-duet.raw.xz
+		IMAGE_LOOP=$(losetup -f -P fedora-duet.raw --show)
+		dd if=${IMAGE_LOOP}p3 of=fedora-duet.rootfs
+		losetup -d $IMAGE_LOOP
+		mkdir -p fedrootfs
+		mount fedora-duet.rootfs fedrootfs/
+		rsync -aHAX fedrootfs/* /mnt
+		for x in {1..3}; do sed -i '$d' /mnt/etc/fstab; sleep 1; done
+		cd $ROOT/builds/linux
+		make INSTALL_MOD_PATH=/mnt modules_install
+		cp $QEMU /mnt
+		chroot /mnt /qemu-aarch64-static /bin/passwd root
+		echo "Remember post-install setup"
+		;;
+	esac
 echo "Success"
 exit
