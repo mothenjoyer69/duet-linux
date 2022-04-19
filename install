@@ -15,22 +15,39 @@ case $2 in
 		mkdir linux
 		tar xvf Linux-archive --strip-components=1 -C linux
 		cd linux
-		#todo: test if these are even needed
-		for x in $(ls $ROOT/kernel/patches/*.patch); do
-			echo "Applying $x"
-			patch -p1 --forward < $x
-		done
-		cp $ROOT/kernel/krane.config $ROOT/builds/linux/.config
-		make menuconfig
-		make -j$(nproc)
-		mkdir $ROOT/assembly
-		cd $ROOT/assembly
-		cp "$ROOT/kernel/kernel.its" $ROOT/assembly/kernel.its
-		cp "$ROOT/kernel/cmdline" $ROOT/assembly/cmdline
-		cp "$ROOT/builds/linux/arch/arm64/boot/Image" $ROOT/assembly
-		cp "$ROOT/builds/linux/arch/arm64/boot/Image.gz" $ROOT/assembly
-		cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku0.dtb" $ROOT/assembly	
-		cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku176.dtb" $ROOT/assembly
+		case $4 in
+		-krane)
+			#todo: test if these are even needed
+			for x in $(ls $ROOT/kernel/patches/*.patch); do
+				echo "Applying $x"
+				patch -p1 --forward < $x
+			done
+			cp $ROOT/kernel/krane.config $ROOT/builds/linux/.config
+			make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- menuconfig
+			make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) 
+			mkdir $ROOT/assembly
+			cd $ROOT/assembly
+			cp "$ROOT/kernel/krane/kernel.its" $ROOT/assembly/kernel.its
+			cp "$ROOT/kernel/krane/cmdline" $ROOT/assembly/cmdline
+			cp "$ROOT/builds/linux/arch/arm64/boot/Image" $ROOT/assembly
+			cp "$ROOT/builds/linux/arch/arm64/boot/Image.gz" $ROOT/assembly
+			cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku0.dtb" $ROOT/assembly	
+			cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku176.dtb" $ROOT/assembly
+			;;
+		-nyan)
+			cp $ROOT/kernel/krane.config $ROOT/builds/linux/.config
+			make ARCH=arm CROSS_COMPILE=arm-linux-gnu- menuconfig
+			make ARCH=arm CROSS_COMPILE=arm-linux-gnu- -j$(nproc) 
+			mkdir $ROOT/assembly
+			cd $ROOT/assembly
+			cp "$ROOT/kernel/nyan/kernel.its" $ROOT/assembly/kernel.its
+			cp "$ROOT/kernel/nyan/cmdline" $ROOT/assembly/cmdline #Doesn't exist yet
+			cp "$ROOT/builds/linux/arch/arm/boot/Image" $ROOT/assembly
+			cp "$ROOT/builds/linux/arch/arm/boot/Image.gz" $ROOT/assembly
+			cp "$ROOT/builds/linux/arch/arm/boot/dts/tegra124-nyan-big.dtb" $ROOT/assembly	
+			;;
+		esac
+		
 		dd if=/dev/zero of=bootloader.bin bs=512 count=1
 		mkimage -D "-I dts -O dtb -p 2048" -f kernel.its vmlinux.uimg
 		vbutil_kernel --pack vmlinux.img \
@@ -130,7 +147,7 @@ case $3 in
 		tar xzvpf $ROOT/rootfs/alpine-minirootfs-3.15.0-aarch64.tar.gz -C /mnt/ #this doesn't work currently, although it *does* boot. 
 		cd $ROOT/builds/linux
 		make INSTALL_MOD_PATH=/mnt modules_install
-		sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow
+		sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow #this is supposed to set the password as 'gentoo' but doesn't like to
 		umount $ROOTFS
 		echo "Alpine rootfs installed"
 		;;
@@ -143,7 +160,7 @@ case $3 in
 		tar xvpf $ROOT/rootfs/stage3-arm64-openrc-20220220T235324Z.tar.xz -C /mnt/ #this doesn't work right currently, although it *does* boot.
 		echo "ACCEPT_KEYWORDS=\"arm64\"" >> /mnt/etc/portage/make.conf 
 		echo "MAKEOPTS=\"-j4\"" >> /mnt/etc/portage/make.conf 
-		sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow 
+		sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow #this sets password as 'gentoo'
 		cd $ROOT/builds/linux
 		make INSTALL_MOD_PATH=/mnt modules_install
 		umount $ROOTFS	
@@ -158,32 +175,12 @@ case $3 in
 		cd $ROOT/builds/linux
 		make INSTALL_MOD_PATH=/mnt modules_install
 		cp $QEMU /mnt
-		sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow
+		sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow #this sets password as 'gentoo'
 		#cp /etc/resolv.conf /mnt/etc/resolv.conf
-		chroot /mnt apt update
-		chroot /mnt apt install -y nano network-manager debootstrap parted libudev-dev build-essential git
+		chroot /mnt apt update #needs binfmnt and qemu-utils, if it doesn't work just do it manually 
+		chroot /mnt apt install -y nano network-manager debootstrap parted libudev-dev build-essential git #needs binfmnt and qemu-utils, if it doesn't work just do it manually 
 		umount $ROOTFS	
 		echo "Debian rootfs installed"
-		;;
-	-fedora)
-		rm -rf $ROOT/rootfs
-		mkdir $ROOT/rootfs
-		cd $ROOT/rootfs
-		mount $ROOTFS /mnt
-		wget https://download.fedoraproject.org/pub/fedora-secondary/releases/35/Spins/aarch64/images/Fedora-Minimal-35-1.2.aarch64.raw.xz -O fedora-duet.raw.xz
-		xz -vd $ROOT/rootfs/fedora-duet.raw.xz
-		IMAGE_LOOP=$(losetup -f -P fedora-duet.raw --show)
-		dd if=${IMAGE_LOOP}p3 of=fedora-duet.rootfs
-		losetup -d $IMAGE_LOOP
-		mkdir -p fedrootfs
-		mount fedora-duet.rootfs fedrootfs/
-		rsync -aHAX fedrootfs/* /mnt
-		for x in {1..3}; do sed -i '$d' /mnt/etc/fstab; sleep 1; done
-		cd $ROOT/builds/linux
-		make INSTALL_MOD_PATH=/mnt modules_install
-		cp $QEMU /mnt
-		chroot /mnt /qemu-aarch64-static /bin/passwd root
-		echo "Remember post-install setup"
 		;;
 	esac
 echo "Success"
