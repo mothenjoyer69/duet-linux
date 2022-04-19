@@ -22,7 +22,7 @@ case $2 in
 				echo "Applying $x"
 				patch -p1 --forward < $x
 			done
-			cp $ROOT/kernel/krane.config $ROOT/builds/linux/.config
+			cp $ROOT/kernel/krane/krane.config $ROOT/builds/linux/.config
 			make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- menuconfig
 			make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) 
 			mkdir $ROOT/assembly
@@ -35,7 +35,7 @@ case $2 in
 			cp "$ROOT/builds/linux/arch/arm64/boot/dts/mediatek/mt8183-kukui-krane-sku176.dtb" $ROOT/assembly
 			;;
 		-nyan)
-			cp $ROOT/kernel/krane.config $ROOT/builds/linux/.config
+			cp $ROOT/kernel/krane/krane.config $ROOT/builds/linux/.config
 			make ARCH=arm CROSS_COMPILE=arm-linux-gnu- menuconfig
 			make ARCH=arm CROSS_COMPILE=arm-linux-gnu- -j$(nproc) 
 			mkdir $ROOT/assembly
@@ -143,8 +143,13 @@ case $3 in
 		cd $ROOT/rootfs
 		mount $ROOTFS /mnt
 		#temporary testing: TODO use qemu to fix some glaring issues prior to first boot, and switch rootfs.
-		wget https://dl-cdn.alpinelinux.org/alpine/v3.15/releases/aarch64/alpine-minirootfs-3.15.0-aarch64.tar.gz
-		tar xzvpf $ROOT/rootfs/alpine-minirootfs-3.15.0-aarch64.tar.gz -C /mnt/ #this doesn't work currently, although it *does* boot. 
+		if [[ $4 = "-krane" ]]; then
+			wget https://dl-cdn.alpinelinux.org/alpine/v3.15/releases/aarch64/alpine-minirootfs-3.15.0-aarch64.tar.gz
+			tar xzvpf $ROOT/rootfs/alpine-minirootfs-* -C /mnt/ #this doesn't work currently, although it *does* boot.
+		else
+			wget https://dl-cdn.alpinelinux.org/alpine/v3.15/releases/armv7/alpine-minirootfs-3.15.4-armv7.tar.gz
+			tar xzvpf $ROOT/rootfs/alpine-minirootfs-* -C /mnt/ #this doesn't work currently, although it *does* boot.
+		fi
 		cd $ROOT/builds/linux
 		make INSTALL_MOD_PATH=/mnt modules_install
 		sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow #this is supposed to set the password as 'gentoo' but doesn't like to
@@ -156,8 +161,13 @@ case $3 in
 		cd $ROOT/rootfs
 		mount $ROOTFS /mnt
 		#temporary testing: TODO use qemu to fix some glaring issues prior to first boot, and switch rootfs.
-		wget https://bouncer.gentoo.org/fetch/root/all/releases/arm64/autobuilds/20220220T235324Z/stage3-arm64-openrc-20220220T235324Z.tar.xz
-		tar xvpf $ROOT/rootfs/stage3-arm64-openrc-20220220T235324Z.tar.xz -C /mnt/ #this doesn't work right currently, although it *does* boot.
+		if [[ $4 = "-krane" ]]; then
+			wget https://bouncer.gentoo.org/fetch/root/all/releases/arm64/autobuilds/20220220T235324Z/stage3-arm64-openrc-20220220T235324Z.tar.xz
+			tar xvpf $ROOT/rootfs/stage3-arm64-openrc-20220220T235324Z.tar.xz -C /mnt/ #this doesn't work right currently, although it *does* boot.
+		else
+			wget https://bouncer.gentoo.org/fetch/root/all/releases/arm/autobuilds/20220415T141937Z/stage3-armv7a-openrc-20220415T141937Z.tar.xz
+			tar xvpf $ROOT/rootfs/stage3-armv7a-openrc-20220415T141937Z.tar.xz -C /mnt/ #this doesn't work right currently, although it *does* boot.
+		fi
 		echo "ACCEPT_KEYWORDS=\"arm64\"" >> /mnt/etc/portage/make.conf 
 		echo "MAKEOPTS=\"-j4\"" >> /mnt/etc/portage/make.conf 
 		sed -i 's/root\:\*/root\:\$6\$I9Q9AyTL\$Z76H7wD8mT9JAyrp\/vaYyFwyA5wRVN0tze8pvM\.MqScC7BBm2PU7pLL0h5nSxueqUpYAlZTox4Ag2Dp5vchjJ0/' /mnt/etc/shadow #this sets password as 'gentoo'
@@ -171,7 +181,10 @@ case $3 in
 		cd $ROOT/rootfs
 		mount $ROOTFS /mnt
 		#temporary testing: TODO use qemu to fix some glaring issues prior to first boot, and switch rootfs.
-		debootstrap --arch="arm64" "stable" "/mnt"  https://deb.debian.org/debian/
+		if [[ $4 = "-krane" ]]; then
+			debootstrap --arch="arm64" "stable" "/mnt"  https://deb.debian.org/debian/
+		else
+			debootstrap --arch="armv7" "stable" "/mnt"  https://deb.debian.org/debian/
 		cd $ROOT/builds/linux
 		make INSTALL_MOD_PATH=/mnt modules_install
 		cp $QEMU /mnt
